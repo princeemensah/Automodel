@@ -25,6 +25,7 @@ model:
   pretrained_model_name_or_path: google/gemma-3-27b-it
   torch_dtype: bf16
   attn_implementation: sdpa
+  activation_checkpointing: true
 
 checkpoint:
   enabled: true
@@ -35,8 +36,8 @@ checkpoint:
 peft:
   _target_: nemo_automodel.components._peft.lora.PeftConfig
   match_all_linear: True
-  dim: 16
-  alpha: 32
+  dim: 8
+  alpha: 16
   use_triton: True
 
 distributed:
