@@ -246,6 +246,21 @@ def default_collater(batch, pad_seq_len_divisible=None):
     return {k: batchify(torch.LongTensor(v)) for k, v in ans.items()}
 
 
+def default_collater_with_token_type_ids(batch, pad_seq_len_divisible=None):
+    """
+    Default collater that injects `token_type_ids` when missing.
+
+    This is useful for models (e.g., Gemma 3) that require `token_type_ids`
+    during training even for text-only batches.
+    """
+    collated = default_collater(batch, pad_seq_len_divisible=pad_seq_len_divisible)
+
+    if "token_type_ids" not in collated and "input_ids" in collated:
+        collated["token_type_ids"] = torch.zeros_like(collated["input_ids"])
+
+    return collated
+
+
 def packed_sequence_thd_collater(batch):
     """
     Collater for packed sequences in THD (total, hidden, depth) format.

@@ -1,0 +1,99 @@
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+# Licensed under the Apache License, Version 2.0
+
+# Gemma 3 27B IT — Chat + Safety + Tool-use (PEFT) starter config.
+# This expects OpenAI-format chat JSONL files with a top-level `messages` list.
+# You can build those JSONL files by converting the HF datasets listed below.
+
+step_scheduler:
+  global_batch_size: 32
+  local_batch_size: 1
+  ckpt_every_steps: 500
+  val_every_steps: 500
+  max_steps: 1000
+
+dist_env:
+  backend: nccl
+  timeout_minutes: 1
+
+rng:
+  _target_: nemo_automodel.components.training.rng.StatefulRNG
+  seed: 1111
+  ranked: true
+
+model:
+  _target_: nemo_automodel.NeMoAutoModelForCausalLM.from_pretrained
+  pretrained_model_name_or_path: google/gemma-3-27b-it
+  torch_dtype: bf16
+  attn_implementation: eager
+
+checkpoint:
+  enabled: true
+  checkpoint_dir: /workspace/finetuning/checkpoints/gemma_3_27b_it_chat_safety_tool_peft
+  model_save_format: safetensors
+  save_consolidated: false
+
+peft:
+  _target_: nemo_automodel.components._peft.lora.PeftConfig
+  match_all_linear: True
+  dim: 16
+  alpha: 32
+  use_triton: True
+
+distributed:
+  _target_: nemo_automodel.components.distributed.fsdp2.FSDP2Manager
+  dp_size: none
+  tp_size: 1
+  cp_size: 1
+  sequence_parallel: false
+
+loss_fn:
+  _target_: nemo_automodel.components.loss.masked_ce.MaskedCrossEntropy
+
+dataset:
+  _target_: nemo_automodel.components.datasets.llm.ChatDataset
+  # Local OpenAI-format JSONL files (messages/tools). Convert from HF first.
+  # Suggested sources to convert:
+  # - HuggingFaceH4/ultrachat_200k
+  # - GAIR/lima
+  # - Anthropic/hh-rlhf
+  # - PKU-Alignment/PKU-SafeRLHF-30K
+  # - gorilla-llm/APIBench (or ToolBench)
+  path_or_dataset_id:
+    - /workspace/finetuning/data/chat/ultrachat_messages.jsonl
+    - /workspace/finetuning/data/chat/lima_messages.jsonl
+    - /workspace/finetuning/data/safety/hh_rlhf_messages.jsonl
+    - /workspace/finetuning/data/safety/pku_safrlhf_messages.jsonl
+    - /workspace/finetuning/data/tool/gorilla_apibench_messages.jsonl
+  split: null
+  seq_length: 4096
+  padding: do_not_pad
+  truncation: do_not_truncate
+
+packed_sequence:
+  packed_sequence_size: 0
+
+dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  collate_fn: nemo_automodel.components.datasets.utils.default_collater_with_token_type_ids
+  shuffle: true
+
+validation_dataset:
+  _target_: nemo_automodel.components.datasets.llm.ChatDataset
+  path_or_dataset_id:
+    - /workspace/finetuning/data/val/validation_messages.jsonl
+  split: null
+  seq_length: 4096
+  padding: do_not_pad
+  truncation: do_not_truncate
+
+validation_dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  collate_fn: nemo_automodel.components.datasets.utils.default_collater_with_token_type_ids
+
+optimizer:
+  _target_: torch.optim.Adam
+  betas: [0.9, 0.999]
+  eps: 1e-8
+  lr: 1.0e-5
+  weight_decay: 0
