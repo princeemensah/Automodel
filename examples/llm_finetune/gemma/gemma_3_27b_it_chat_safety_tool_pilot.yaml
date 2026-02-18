@@ -5,7 +5,7 @@
 # Use small converted JSONL files to validate pipeline end-to-end.
 
 step_scheduler:
-  global_batch_size: 4
+  global_batch_size: 1
   local_batch_size: 1
   ckpt_every_steps: 25
   val_every_steps: 25
@@ -36,9 +36,9 @@ checkpoint:
 peft:
   _target_: nemo_automodel.components._peft.lora.PeftConfig
   match_all_linear: True
-  dim: 8
-  alpha: 16
-  use_triton: True
+  dim: 4
+  alpha: 8
+  use_triton: False
 
 distributed:
   _target_: nemo_automodel.components.distributed.fsdp2.FSDP2Manager
@@ -57,7 +57,7 @@ dataset:
     - /workspace/finetuning/data/pilot/hh_rlhf_messages.jsonl
     - /workspace/finetuning/data/pilot/xlam_messages.jsonl
   split: null
-  seq_length: 1024
+  seq_length: 512
   padding: do_not_pad
   truncation: do_not_truncate
 
@@ -74,7 +74,7 @@ validation_dataset:
   path_or_dataset_id:
     - /workspace/finetuning/data/pilot/validation_messages.jsonl
   split: null
-  seq_length: 1024
+  seq_length: 512
   padding: do_not_pad
   truncation: do_not_truncate
 
