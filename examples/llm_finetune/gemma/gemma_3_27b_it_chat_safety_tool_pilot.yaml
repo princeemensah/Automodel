@@ -54,7 +54,7 @@ dataset:
   path_or_dataset_id:
     - /workspace/finetuning/data/pilot/ultrachat_messages.jsonl
     - /workspace/finetuning/data/pilot/hh_rlhf_messages.jsonl
-    - /workspace/finetuning/data/pilot/gorilla_apibench_messages.jsonl
+    - /workspace/finetuning/data/pilot/xlam_messages.jsonl
   split: null
   seq_length: 4096
   padding: do_not_pad

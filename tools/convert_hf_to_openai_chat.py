@@ -40,6 +40,21 @@ ROLE_MAP = {
     "tool": "tool",
 }
 
+_XLAM_TYPE_MAP = {
+    "str": "string",
+    "string": "string",
+    "int": "integer",
+    "integer": "integer",
+    "float": "number",
+    "double": "number",
+    "number": "number",
+    "bool": "boolean",
+    "boolean": "boolean",
+    "list": "array",
+    "array": "array",
+    "object": "object",
+}
+
 
 def _ensure_dir(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -80,6 +95,81 @@ def _normalize_messages(messages: Iterable[Dict[str, Any]]) -> Optional[List[Dic
             out["name"] = m["name"]
         normalized.append(out)
     return normalized or None
+
+
+def _json_load_if_str(value: Any) -> Any:
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return value
+    return value
+
+
+def _convert_xlam_tools(raw_tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    converted: List[Dict[str, Any]] = []
+    for tool in raw_tools or []:
+        name = tool.get("name")
+        if not name:
+            continue
+        description = tool.get("description", "")
+        params_raw: Dict[str, Any] = tool.get("parameters") or {}
+
+        properties: Dict[str, Dict[str, Any]] = {}
+        required: List[str] = []
+        for param_name, param_def in params_raw.items():
+            if param_def is None:
+                continue
+            param_type = str(param_def.get("type", "string")).lower()
+            mapped_type = _XLAM_TYPE_MAP.get(param_type, "string")
+            prop: Dict[str, Any] = {
+                "type": mapped_type,
+                "description": param_def.get("description", ""),
+            }
+            if "enum" in param_def:
+                prop["enum"] = param_def["enum"]
+            if "default" in param_def:
+                prop["default"] = param_def["default"]
+            else:
+                required.append(param_name)
+            properties[param_name] = prop
+
+        parameters_schema: Dict[str, Any] = {"type": "object", "properties": properties}
+        if required:
+            parameters_schema["required"] = required
+
+        converted.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": name,
+                    "description": description,
+                    "parameters": parameters_schema,
+                },
+            }
+        )
+    return converted
+
+
+def _convert_xlam_tool_calls(raw_calls: List[Dict[str, Any]], example_id: Optional[Any]) -> List[Dict[str, Any]]:
+    tool_calls: List[Dict[str, Any]] = []
+    for idx, call in enumerate(raw_calls or []):
+        name = call.get("name")
+        if not name:
+            continue
+        arguments = call.get("arguments", "")
+        call_id = f"call_{example_id}_{idx}" if example_id is not None else f"call_{idx}"
+        tool_calls.append(
+            {
+                "id": call_id,
+                "type": "function",
+                "function": {
+                    "name": name,
+                    "arguments": arguments,
+                },
+            }
+        )
+    return tool_calls
 
 
 def _parse_hh_transcript(text: str) -> Optional[List[Dict[str, Any]]]:
@@ -129,6 +219,16 @@ def _instruction_to_messages(row: Dict[str, Any]) -> Optional[List[Dict[str, Any
 
 
 def _row_to_messages(row: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+    if "query" in row and "answers" in row and "tools" in row:
+        answers = _json_load_if_str(row.get("answers"))
+        tool_calls = _convert_xlam_tool_calls(answers, row.get("id"))
+        if not tool_calls:
+            return None
+        return [
+            {"role": "user", "content": str(row.get("query", "")).strip()},
+            {"role": "assistant", "content": "", "tool_calls": tool_calls},
+        ]
+
     if isinstance(row.get("messages"), list):
         return _normalize_messages(row["messages"])
 
@@ -149,6 +249,10 @@ def _row_to_messages(row: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
 
 
 def _row_tools(row: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+    if "query" in row and "answers" in row and "tools" in row:
+        tools = _json_load_if_str(row.get("tools"))
+        if isinstance(tools, list):
+            return _convert_xlam_tools(tools)
     tools = row.get("tools")
     if isinstance(tools, list):
         return tools
