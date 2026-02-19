@@ -35,7 +35,12 @@ checkpoint:
 
 peft:
   _target_: nemo_automodel.components._peft.lora.PeftConfig
-  match_all_linear: True
+  target_modules:
+    - q_proj
+    - v_proj
+  match_all_linear: False
+  exclude_modules:
+    - "*vision_tower*"
   dim: 4
   alpha: 8
   use_triton: False
@@ -47,6 +52,15 @@ distributed:
   cp_size: 1
   sequence_parallel: false
 
+fp8:
+  enabled: true
+  recipe_name: tensorwise
+  enable_fsdp_float8_all_gather: true
+  precompute_float8_dynamic_scale_for_fsdp: true
+  force_recompute_fp8_weight_in_bwd: true
+  filter_fqns: ["lm_head"]
+  emulate: false
+
 loss_fn:
   _target_: nemo_automodel.components.loss.masked_ce.MaskedCrossEntropy
 
@@ -57,16 +71,18 @@ dataset:
     - /workspace/finetuning/data/pilot/hh_rlhf_messages.jsonl
     - /workspace/finetuning/data/pilot/xlam_messages.jsonl
   split: null
-  seq_length: 512
-  padding: do_not_pad
-  truncation: do_not_truncate
+  seq_length: 128
+  padding: max_length
+  truncation: longest_first
 
 packed_sequence:
   packed_sequence_size: 0
 
 dataloader:
   _target_: torchdata.stateful_dataloader.StatefulDataLoader
-  collate_fn: nemo_automodel.components.datasets.utils.default_collater_with_token_type_ids
+  collate_fn:
+    _target_: nemo_automodel.components.datasets.utils.default_collater_with_token_type_ids
+    pad_seq_len_divisible: 16
   shuffle: true
 
 validation_dataset:
@@ -74,13 +90,15 @@ validation_dataset:
   path_or_dataset_id:
     - /workspace/finetuning/data/pilot/validation_messages.jsonl
   split: null
-  seq_length: 512
-  padding: do_not_pad
-  truncation: do_not_truncate
+  seq_length: 128
+  padding: max_length
+  truncation: longest_first
 
 validation_dataloader:
   _target_: torchdata.stateful_dataloader.StatefulDataLoader
-  collate_fn: nemo_automodel.components.datasets.utils.default_collater_with_token_type_ids
+  collate_fn:
+    _target_: nemo_automodel.components.datasets.utils.default_collater_with_token_type_ids
+    pad_seq_len_divisible: 16
 
 optimizer:
   _target_: torch.optim.Adam
