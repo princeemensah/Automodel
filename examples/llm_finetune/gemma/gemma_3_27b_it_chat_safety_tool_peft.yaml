@@ -26,6 +26,7 @@ model:
   pretrained_model_name_or_path: google/gemma-3-27b-it
   torch_dtype: bf16
   attn_implementation: eager
+  force_hf: true
 
 checkpoint:
   enabled: true
@@ -46,6 +47,14 @@ distributed:
   tp_size: 1
   cp_size: 1
   sequence_parallel: false
+
+quantization:
+  load_in_4bit: true
+  load_in_8bit: false
+  bnb_4bit_compute_dtype: bfloat16
+  bnb_4bit_use_double_quant: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_quant_storage: bfloat16
 
 loss_fn:
   _target_: nemo_automodel.components.loss.masked_ce.MaskedCrossEntropy

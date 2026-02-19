@@ -26,6 +26,7 @@ model:
   torch_dtype: bf16
   attn_implementation: sdpa
   activation_checkpointing: true
+  force_hf: true
 
 checkpoint:
   enabled: true
@@ -50,14 +51,13 @@ distributed:
   cp_size: 1
   sequence_parallel: false
 
-fp8:
-  enabled: true
-  recipe_name: tensorwise
-  enable_fsdp_float8_all_gather: true
-  precompute_float8_dynamic_scale_for_fsdp: true
-  force_recompute_fp8_weight_in_bwd: true
-  filter_fqns: ["lm_head"]
-  emulate: false
+quantization:
+  load_in_4bit: true
+  load_in_8bit: false
+  bnb_4bit_compute_dtype: bfloat16
+  bnb_4bit_use_double_quant: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_quant_storage: bfloat16
 
 loss_fn:
   _target_: nemo_automodel.components.loss.masked_ce.MaskedCrossEntropy
