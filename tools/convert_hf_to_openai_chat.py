@@ -219,6 +219,20 @@ def _instruction_to_messages(row: Dict[str, Any]) -> Optional[List[Dict[str, Any
 
 
 def _row_to_messages(row: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+    if "prompt" in row and "response_0" in row and "response_1" in row:
+        safer_id = row.get("safer_response_id")
+        better_id = row.get("better_response_id")
+        chosen_id = safer_id if isinstance(safer_id, int) else better_id
+        if chosen_id not in (0, 1):
+            chosen_id = 0
+        response = row.get(f"response_{chosen_id}")
+        prompt = row.get("prompt")
+        if prompt and response:
+            return [
+                {"role": "user", "content": str(prompt).strip()},
+                {"role": "assistant", "content": str(response).strip()},
+            ]
+
     if "query" in row and "answers" in row and "tools" in row:
         answers = _json_load_if_str(row.get("answers"))
         tool_calls = _convert_xlam_tool_calls(answers, row.get("id"))
