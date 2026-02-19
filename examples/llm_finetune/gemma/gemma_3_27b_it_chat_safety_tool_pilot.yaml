@@ -36,11 +36,11 @@ checkpoint:
 peft:
   _target_: nemo_automodel.components._peft.lora.PeftConfig
   target_modules:
-    - "*language_model*.self_attn.q_proj"
-    - "*language_model*.self_attn.v_proj"
+    - q_proj
+    - v_proj
   match_all_linear: False
-  dim: 4
-  alpha: 8
+  dim: 2
+  alpha: 4
   use_triton: False
 
 distributed:
