@@ -38,6 +38,7 @@ ROLE_MAP = {
     "gpt": "assistant",
     "system": "system",
     "tool": "tool",
+    "prompter": "user",
 }
 
 _XLAM_TYPE_MAP = {
@@ -273,6 +274,47 @@ def _row_tools(row: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
     return None
 
 
+def _convert_oasst1_pairs(rows: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    by_id: Dict[str, Dict[str, Any]] = {}
+    filtered: List[Dict[str, Any]] = []
+    for row in rows:
+        if row.get("deleted"):
+            continue
+        if "review_result" in row and row.get("review_result") is False:
+            continue
+        if row.get("tree_state") and row.get("tree_state") != "ready_for_export":
+            continue
+        msg_id = row.get("message_id")
+        if msg_id:
+            by_id[msg_id] = row
+        filtered.append(row)
+
+    converted: List[Dict[str, Any]] = []
+    for row in filtered:
+        if str(row.get("role", "")).lower() != "assistant":
+            continue
+        parent_id = row.get("parent_id")
+        if not parent_id or parent_id not in by_id:
+            continue
+        parent = by_id[parent_id]
+        parent_role = str(parent.get("role", "")).lower()
+        if parent_role not in ("prompter", "user"):
+            continue
+        user_text = _stringify_content(parent.get("text"))
+        assistant_text = _stringify_content(row.get("text"))
+        if not user_text or not assistant_text:
+            continue
+        converted.append(
+            {
+                "messages": [
+                    {"role": "user", "content": user_text},
+                    {"role": "assistant", "content": assistant_text},
+                ]
+            }
+        )
+    return converted
+
+
 def convert_dataset(dataset_id: str, split: str, name: Optional[str], limit: Optional[int]) -> List[Dict[str, Any]]:
     logger.info("Loading %s (split=%s)", dataset_id, split)
     ds = load_dataset(
@@ -284,6 +326,15 @@ def convert_dataset(dataset_id: str, split: str, name: Optional[str], limit: Opt
     )
     if limit:
         ds = ds.select(range(limit))
+
+    if all(
+        field in ds.features
+        for field in ("message_id", "parent_id", "text", "role")
+    ):
+        logger.info("Detected OASST-style dataset; converting parent/child pairs")
+        converted = _convert_oasst1_pairs(ds)
+        logger.info("Converted %d rows, skipped %d rows", len(converted), len(ds) - len(converted))
+        return converted
 
     converted: List[Dict[str, Any]] = []
     skipped = 0
