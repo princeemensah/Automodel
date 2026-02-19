@@ -70,7 +70,7 @@ dataset:
   # - Salesforce/xlam-function-calling-60k
   path_or_dataset_id:
     - /workspace/finetuning/data/chat/ultrachat_messages.jsonl
-    - /workspace/finetuning/data/chat/lima_messages.jsonl
+    - /workspace/finetuning/data/chat/oasst1_messages.jsonl
     - /workspace/finetuning/data/safety/hh_rlhf_messages.jsonl
     - /workspace/finetuning/data/safety/pku_safrlhf_messages.jsonl
     - /workspace/finetuning/data/tool/xlam_messages.jsonl

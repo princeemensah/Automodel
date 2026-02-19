@@ -281,7 +281,6 @@ def convert_dataset(dataset_id: str, split: str, name: Optional[str], limit: Opt
         split=split,
         streaming=False,
         verification_mode=VerificationMode.NO_CHECKS,
-        trust_remote_code=True,
     )
     if limit:
         ds = ds.select(range(limit))
