@@ -25,7 +25,8 @@ model:
   _target_: nemo_automodel.NeMoAutoModelForCausalLM.from_pretrained
   pretrained_model_name_or_path: google/gemma-3-27b-it
   torch_dtype: bf16
-  attn_implementation: eager
+  attn_implementation: sdpa
+  activation_checkpointing: true
   force_hf: true
 
 checkpoint:
@@ -36,10 +37,13 @@ checkpoint:
 
 peft:
   _target_: nemo_automodel.components._peft.lora.PeftConfig
-  match_all_linear: True
-  dim: 16
-  alpha: 32
-  use_triton: True
+  target_modules:
+    - "*q_proj"
+    - "*v_proj"
+  match_all_linear: False
+  dim: 8
+  alpha: 16
+  use_triton: False
 
 distributed:
   _target_: nemo_automodel.components.distributed.fsdp2.FSDP2Manager
@@ -75,9 +79,9 @@ dataset:
     - /workspace/finetuning/data/safety/pku_safrlhf_messages.jsonl
     - /workspace/finetuning/data/tool/xlam_messages.jsonl
   split: null
-  seq_length: 4096
-  padding: do_not_pad
-  truncation: do_not_truncate
+  seq_length: 2048
+  padding: max_length
+  truncation: longest_first
 
 packed_sequence:
   packed_sequence_size: 0
@@ -92,9 +96,9 @@ validation_dataset:
   path_or_dataset_id:
     - /workspace/finetuning/data/val/validation_messages.jsonl
   split: null
-  seq_length: 4096
-  padding: do_not_pad
-  truncation: do_not_truncate
+  seq_length: 2048
+  padding: max_length
+  truncation: longest_first
 
 validation_dataloader:
   _target_: torchdata.stateful_dataloader.StatefulDataLoader
